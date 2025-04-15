@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt'
 import userModel from '../models/userModel.js'
 import jwt from 'jsonwebtoken'
 import {v2 as cloudinary} from 'cloudinary'
+import vendorModel from '../models/vendorModel.js'
 
 // Api to register user
 const registerUser = async (req,res)=>{
@@ -118,6 +119,23 @@ const updateProfile= async (req,res) =>{
         console.log(error);
         res.json({success:false,message:error.message})
     }
+}
+
+// api to book bookings
+const bookBooking = async (req,res) =>{
+       try {
+          const {userId,vendId,slotDate,slotTime} = req.body
+
+          const vendData= await vendorModel.findById(vendId).select('-password')
+          
+          if(!vendData.available){
+            return res.json({success:false,message:"Vendor not available "})
+          }
+
+       } catch (error) {
+        console.log(error);
+        res.json({success:false,message:error.message})
+       }
 }
 
 export {registerUser , loginUser , getProfile , updateProfile }
