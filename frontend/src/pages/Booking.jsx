@@ -1,14 +1,18 @@
 import React, { useContext, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { AppContext } from '../context/AppContext'
 import Vendors from './vendors'
 import { assets } from '../assets/assets'
+import { toast } from 'react-toastify'
+import axios from 'axios'
 
 const Booking = () => {
 
   const {vendId}=useParams()
-  const {vendors,currencySymbol}=useContext(AppContext)
+  const {vendors,currencySymbol,backendUrl,token,getVendorsData}=useContext(AppContext)
   const daysOfWeek = ['SUN','MON','TUE','WED','THU','FRI','SAT']
+
+  const navigate = useNavigate()
 
   const [vendInfo,setVendInfo] =useState(null)
 
@@ -48,11 +52,25 @@ const Booking = () => {
 
         while(currentDate < endTime) {
           let formattedTime= currentDate.toLocaleTimeString([],{hour :'2-digit',minute:'2-digit'})
+
+          let day = currentDate.getDate()
+          let month = currentDate.getMonth()+1
+          let year = currentDate.getFullYear()
+
+          const slotDate = day + "_" + month + "_" + year
+          const slotTime = formattedTime
+
+          const isSlotAvailable = vendInfo.slots_booked[slotDate] && vendInfo.slots_booked[slotDate].includes(slotTime) ? false : true
+          if(isSlotAvailable){
+            // add slot to array
+            timeSlots.push({
+              datetime: new Date(currentDate),
+              time: formattedTime
+            })
+          }
+ 
           
-          timeSlots.push({
-            datetime: new Date(currentDate),
-            time: formattedTime
-          })
+          
 
           currentDate.setMinutes(currentDate.getMinutes() + 120)
         }
@@ -60,6 +78,36 @@ const Booking = () => {
        setVendSlots(prev => ([...prev, timeSlots]))
 
       }
+  }
+
+  const bookBooking = async () =>{
+       if(!token){
+        toast.warn('Login to book')
+        return navigate('/login')
+       }
+
+       try {
+         const date= vendSLots[slotIndex][0].datetime
+         let day = date.getDate()
+         let month = date.getMonth()+1
+         let year = date.getFullYear()
+
+         const slotDate=day + "_" + month + "_" + year
+          
+         const {data}= await axios.post(backendUrl + '/api/user/book-booking',{vendId,slotDate,slotTime},{headers:{token}})
+         if(data.success){
+          toast.success(data.message) 
+          getVendorsData()
+          navigate('/my-bookings')
+         }
+         else{
+          toast.error(data.message)
+         }
+         
+       } catch (error) {
+           console.log(error)
+           toast.error(error.message)
+       }
   }
 
   useEffect(()=>{
@@ -119,7 +167,7 @@ const Booking = () => {
                 </p> 
             ))}
           </div>
-          <button className='bg-primary text-white text-sm font-light px-14 py-3 rounded-full my-6'>Book Now</button>
+          <button onClick={bookBooking} className='bg-primary text-white text-sm font-light px-14 py-3 rounded-full my-6'>Book Now</button>
 
          </div>
     </div>

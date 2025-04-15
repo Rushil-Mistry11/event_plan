@@ -4,6 +4,7 @@ import userModel from '../models/userModel.js'
 import jwt from 'jsonwebtoken'
 import {v2 as cloudinary} from 'cloudinary'
 import vendorModel from '../models/vendorModel.js'
+import bookingModel from '../models/bookingModel.js'
 
 // Api to register user
 const registerUser = async (req,res)=>{
@@ -124,13 +125,54 @@ const updateProfile= async (req,res) =>{
 // api to book bookings
 const bookBooking = async (req,res) =>{
        try {
-          const {userId,vendId,slotDate,slotTime} = req.body
+          const {vendId,slotDate,slotTime} = req.body
+          const { userId } = req.user; //use this otherwise there will be error of not getting userId ,because we used req.user in middleware authUser
 
           const vendData= await vendorModel.findById(vendId).select('-password')
           
           if(!vendData.available){
-            return res.json({success:false,message:"Vendor not available "})
+            return res.json({success:false,message:"Vendor not available"})
           }
+
+          let slots_booked = vendData.slots_booked
+          
+          //checking for slots availability
+          if(slots_booked[slotDate]){
+                if(slots_booked[slotDate].includes(slotTime)){
+                    return res.json({success:false,message:"Slot not available"})
+                }
+                else{
+                    slots_booked[slotDate].push(slotTime)
+                }
+            }
+            else{
+                slots_booked[slotDate]= []
+                slots_booked[slotDate].push(slotTime)
+            }
+
+            const userData = await userModel.findById(userId).select('-password')
+
+            delete vendData.slots_booked
+
+            const bookingData = {
+                userId,
+                vendId,
+                userData,
+                vendData,
+                amount:vendData.prices,
+                slotTime,
+                slotDate,
+                date:Date.now()
+            }
+
+            const newBooking = new bookingModel(bookingData)
+            await newBooking.save()
+
+            //save new slots data in vendData
+            await vendorModel.findByIdAndUpdate(vendId,{slots_booked})
+
+            res.json({success:true,message:'Booking booked'})
+
 
        } catch (error) {
         console.log(error);
@@ -138,4 +180,53 @@ const bookBooking = async (req,res) =>{
        }
 }
 
-export {registerUser , loginUser , getProfile , updateProfile }
+// api to get user bookings for frontend my-bookings page
+const listBooking = async (req,res) =>{
+    try {
+        const {userId} = req.user
+        const bookings = await bookingModel.find({userId})
+
+        res.json({success:true,bookings})
+
+    } catch (error) {
+        console.log(error);
+        res.json({success:false,message:error.message})
+    }
+}
+
+//api to cancel booking
+const cancelBooking = async (req,res) =>{
+    try {
+        const {userId} = req.user
+        const {bookingId} = req.body
+
+        const bookingData= await bookingModel.findById(bookingId)
+
+        // verify booking user
+        if(bookingData.userId !== userId){
+            return res.json({success:false,message:'Unauthorized action'})
+        }
+
+        await bookingModel.findByIdAndUpdate(bookingId,{cancelled:true})
+
+        // releasing vendor slots
+
+        const {vendId,slotDate,slotTime} = bookingData
+
+        const vendorData = await vendorModel.findById(vendId)
+
+        let slots_booked = vendorData.slots_booked
+
+        slots_booked[slotDate] = slots_booked[slotDate].filter(e => e!== slotTime)
+
+        await vendorModel.findByIdAndUpdate(vendId,{slots_booked})
+
+        res.json({success:true,message:"Booking cancelled"})
+
+    } catch (error) {
+        console.log(error);
+        res.json({success:false,message:error.message})
+    }
+}
+
+export {registerUser , loginUser , getProfile , updateProfile ,bookBooking , listBooking ,cancelBooking}

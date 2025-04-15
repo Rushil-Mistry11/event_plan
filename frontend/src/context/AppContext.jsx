@@ -48,10 +48,10 @@ const AppContextProvider=(props)=>{
         }
     }
 
-    
+
 
     const value={
-        vendors,
+        vendors,getVendorsData,
         currencySymbol,
         token,setToken,
         backendUrl,
