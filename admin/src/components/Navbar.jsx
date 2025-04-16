@@ -2,17 +2,21 @@ import React, { useContext } from 'react'
 import { assets } from '../assets/assets'
 import { AdminContext } from '../context/AdminContext'
 import { useNavigate } from 'react-router-dom'
+import { VendorContext } from '../context/VendorContext'
 
 const Navbar = () => {
  
     const {aToken,setAToken} = useContext(AdminContext)
+    const {vToken,setVToken} = useContext(VendorContext)
 
     const navigate = useNavigate()
 
     const logout = () =>{
-        navigate('/')
+        navigate('/') 
          aToken &&  setAToken('')
          aToken && localStorage.removeItem('aToken')
+         vToken && setVToken('')
+         vToken && localStorage.removeItem('vToken')
     }
 
   return (
